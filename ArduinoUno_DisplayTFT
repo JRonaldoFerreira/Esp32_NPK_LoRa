@@ -1,0 +1,399 @@
+/**************************************************************
+ *  Arquivo: TFTDisplayEstavel.ino
+ *  Funcao : Leitura robusta dos dados recebidos pela Serial 
+ *           (ex.: "Umidade: 12.0"), atualizacao de variaveis,
+ *           exibicao no display TFT e interacao por toque.
+ **************************************************************/
+
+#include <Adafruit_GFX.h>
+#include <Adafruit_TFTLCD.h>
+#include <TouchScreen.h>
+#include <Fonts/FreeSans9pt7b.h>  // Fonte sem suporte a acentos
+
+// DEFINICOES DE PINOS PARA O DISPLAY TFT
+#define LCD_CS    A3
+#define LCD_CD    A2
+#define LCD_WR    A1
+#define LCD_RD    A0
+#define LCD_RESET A4
+
+// DEFINICOES DE CORES
+#define WHITE    0xFFFF
+#define BLACK    0x0000
+#define RED      0xF800
+#define BLUE     0x001F
+#define GREEN    0x07E0
+#define YELLOW   0xFFE0
+#define CYAN     0x07FF
+#define MAGENTA  0xF81F
+#define GRAY     0x8410
+#define ORANGE   0xFD20
+
+// Pinos do TOUCH
+#define YP A1
+#define XM A2
+#define YM 7 
+#define XP 6
+
+// Sensibilidade do toque
+#define MINPRESSURE  10
+#define MAXPRESSURE 1000
+
+// Objetos para touchscreen e display
+TouchScreen ts = TouchScreen(XP, YP, XM, YM, 300);
+Adafruit_TFTLCD tft(LCD_CS, LCD_CD, LCD_WR, LCD_RD, LCD_RESET);
+
+// Estrutura que define um botao
+struct Botao {
+  int16_t x;
+  int16_t y;
+  int16_t w;
+  int16_t h;
+  uint16_t cor;
+  String texto;
+};
+
+// Enum das paginas
+enum Paginas {
+  PAGINA_MENU,
+  PAGINA_DETALHE
+};
+
+Paginas paginaAtual = PAGINA_MENU;
+int indiceMedidaSelecionada = -1;
+
+// -------------- VARIAVEIS ATUAIS DE LEITURA --------------  
+// (valores que o display efetivamente usa para exibicao)
+float umidade        = 0.0;
+float temperatura    = 0.0;
+int   ec             = 0;
+float ph             = 0.0;
+int   nitrogenio     = 0;
+int   fosforo        = 0;
+int   potassio       = 0;
+
+// -------------- CACHE DE LEITURA TEMPORARIA --------------  
+// (usado internamente para leitura robusta, só vira "oficial" no final)
+float tmpUmidade     = 0.0;
+float tmpTemperatura = 0.0;
+int   tmpEc          = 0;
+float tmpPh          = 0.0;
+int   tmpNitrogenio  = 0;
+int   tmpFosforo     = 0;
+int   tmpPotassio    = 0;
+bool  recebeuAlgumaLinha = false;  // detecta se chegamos a ler algo
+
+// Layout do menu: 2 colunas × 4 linhas
+const int NUM_BOTOES_MENU = 8;
+Botao botoesMenu[NUM_BOTOES_MENU] = {
+  // Indice 0: coluna esquerda, linha 1  
+  {  5,  55, 155, 40, RED,     "Umidade" },
+  // Indice 1: coluna direita, linha 1  
+  {165,  55, 155, 40, BLUE,    "Temperatura" },
+  // Indice 2: coluna esquerda, linha 2  
+  {  5, 100, 155, 40, GREEN,   "Condutividade\nEletrica" },
+  // Indice 3: coluna direita, linha 2  
+  {165, 100, 155, 40, YELLOW,  "pH" },
+  // Indice 4: coluna esquerda, linha 3  
+  {  5, 145, 155, 40, CYAN,    "Nitrogenio" },
+  // Indice 5: coluna direita, linha 3  
+  {165, 145, 155, 40, MAGENTA, "Fosforo" },
+  // Indice 6: coluna esquerda, linha 4  
+  {  5, 190, 155, 40, WHITE,   "Potassio" },
+  // Indice 7: coluna direita, linha 4  
+  {165, 190, 155, 40, ORANGE,  "Atualizar" }
+};
+
+// Botao "Voltar" na pagina de detalhe
+Botao botaoVoltar = { 110, 200, 100, 40, YELLOW, "Voltar" };
+
+// -------------------------------------------------------------------
+// Funcao para desenhar o banner superior
+// -------------------------------------------------------------------
+void desenharBannerSuperior(String titulo) {
+  tft.fillRect(0, 0, tft.width(), 50, BLACK);
+  tft.setFont(&FreeSans9pt7b);
+  tft.setTextColor(WHITE);
+
+  int16_t x1, y1;
+  uint16_t w, h;
+  tft.getTextBounds(titulo, 0, 0, &x1, &y1, &w, &h);
+
+  int16_t cx = (tft.width() - w) / 2;
+  int16_t cy = (50 + h) / 2 + 2;
+  tft.setCursor(cx, cy);
+  tft.print(titulo);
+
+  tft.setFont(); 
+}
+
+// -------------------------------------------------------------------
+// Funcao para desenhar um botao (com possivel quebra de linha)
+// -------------------------------------------------------------------
+void desenharBotao(Botao &b, const GFXfont *fonte = &FreeSans9pt7b) {
+  tft.fillRect(b.x, b.y, b.w, b.h, b.cor);
+  tft.drawRect(b.x, b.y, b.w, b.h, BLACK);
+
+  tft.setFont(fonte);
+  tft.setTextColor(BLACK);
+
+  int newlineIndex = b.texto.indexOf('\n');
+  if (newlineIndex == -1) {
+    // Texto de uma unica linha
+    int16_t x1, y1;
+    uint16_t w, h;
+    tft.getTextBounds(b.texto, 0, 0, &x1, &y1, &w, &h);
+
+    int16_t cx = b.x + (b.w - w) / 2;
+    int16_t cy = b.y + (b.h + h) / 2;
+    tft.setCursor(cx, cy);
+    tft.print(b.texto);
+
+  } else {
+    // Quebra o texto em duas linhas
+    String linha1 = b.texto.substring(0, newlineIndex);
+    String linha2 = b.texto.substring(newlineIndex + 1);
+
+    int16_t x1, y1;
+    uint16_t w1, h1, w2, h2;
+    tft.getTextBounds(linha1, 0, 0, &x1, &y1, &w1, &h1);
+    tft.getTextBounds(linha2, 0, 0, &x1, &y1, &w2, &h2);
+
+    uint16_t totalAltura = h1 + h2;
+    int16_t inicioY = b.y + (b.h - totalAltura) / 2 + h1;
+
+    int16_t cx1 = b.x + (b.w - w1) / 2;
+    int16_t cx2 = b.x + (b.w - w2) / 2;
+
+    tft.setCursor(cx1, inicioY);
+    tft.print(linha1);
+    tft.setCursor(cx2, inicioY + h2);
+    tft.print(linha2);
+  }
+
+  tft.setFont();
+}
+
+// -------------------------------------------------------------------
+// Funcao para desenhar o menu principal
+// -------------------------------------------------------------------
+void desenharMenuPrincipal() {
+  tft.fillScreen(GRAY);
+  desenharBannerSuperior("Menu de Sensores");
+  
+  for (int i = 0; i < NUM_BOTOES_MENU; i++) {
+    desenharBotao(botoesMenu[i]);
+  }
+}
+
+// -------------------------------------------------------------------
+// Funcao para desenhar uma barra de progresso simples
+// -------------------------------------------------------------------
+void desenharBarraProgresso(int16_t x, int16_t y, int16_t w, int16_t h,
+                            uint16_t corBarra) {
+  tft.drawRect(x, y, w, h, WHITE);
+  for (int i = 0; i <= w - 2; i += (w / 10)) {
+    tft.fillRect(x + 1, y + 1, i, h - 2, corBarra);
+    delay(5);
+  }
+}
+
+// -------------------------------------------------------------------
+// Funcao para desenhar a pagina de detalhe
+// -------------------------------------------------------------------
+void desenharPaginaDetalhe(String titulo, float valor) {
+  tft.fillScreen(BLACK);
+  desenharBannerSuperior(titulo);
+
+  int barX = 20;
+  int barY = 60;
+  int barWidth = tft.width() - 40;
+  int barHeight = 20;
+
+  desenharBarraProgresso(barX, barY, barWidth, barHeight, GREEN);
+
+  tft.setFont(&FreeSans9pt7b);
+  tft.setTextColor(WHITE);
+
+  String txtValor = String(valor, 2); // 2 casas decimais
+  
+  int16_t x1, y1;
+  uint16_t w, h;
+  tft.getTextBounds(txtValor, 0, 0, &x1, &y1, &w, &h);
+
+  int16_t valorX = (tft.width() - w) / 2;
+  int16_t valorY = barY + barHeight + ((tft.height() - (barY + barHeight) - 50) - h) / 2;
+
+  tft.setCursor(valorX, valorY);
+  tft.print(txtValor);
+
+  desenharBotao(botaoVoltar, &FreeSans9pt7b);
+}
+
+// -------------------------------------------------------------------
+// Ler dados da Serial de forma robusta
+// -------------------------------------------------------------------
+void lerDadosSerial() {
+  // 1) Limpar "tmp" e marcar que ainda nao recebemos nada
+  tmpUmidade     = umidade;      // comece com os valores atuais
+  tmpTemperatura = temperatura;
+  tmpEc          = ec;
+  tmpPh          = ph;
+  tmpNitrogenio  = nitrogenio;
+  tmpFosforo     = fosforo;
+  tmpPotassio    = potassio;
+  recebeuAlgumaLinha = false;
+
+  unsigned long start = millis();
+  
+  // 2) Ler até achar '---' ou timeout
+  while (millis() - start < 1000) { // 1 segundo de tempo max
+    if (Serial.available() > 0) {
+      String linha = Serial.readStringUntil('\n');
+      linha.trim();
+      
+      if (linha.startsWith("---")) {
+        // Achou fim de transmissao
+        break;
+      }
+
+      // A cada linha que nao seja "---", tentamos parsear
+      int sepPos = linha.indexOf(":");
+      if (sepPos > 0) {
+        recebeuAlgumaLinha = true; // pelo menos 1 linha chegou
+        // Ex.: "Umidade: 45.1"
+        String chave = linha.substring(0, sepPos);
+        chave.trim();
+        String valor = linha.substring(sepPos + 1);
+        valor.trim();
+        
+        if      (chave.equals("Umidade"))                  tmpUmidade     = valor.toFloat();
+        else if (chave.equals("Temperatura"))              tmpTemperatura = valor.toFloat();
+        else if (chave.equals("Condutividade Eletrica"))   tmpEc          = valor.toInt();
+        else if (chave.equals("pH"))                       tmpPh          = valor.toFloat();
+        else if (chave.equals("Nitrogenio"))               tmpNitrogenio  = valor.toInt();
+        else if (chave.equals("Fosforo"))                  tmpFosforo     = valor.toInt();
+        else if (chave.equals("Potassio"))                 tmpPotassio    = valor.toInt();
+      }
+    }
+  }
+
+  // 3) Se recebemos alguma linha, entao atualizamos oficialmente:
+  //    (garantindo que só atualizamos quando a leitura estiver completa)
+  if (recebeuAlgumaLinha) {
+    umidade     = tmpUmidade;
+    temperatura = tmpTemperatura;
+    ec          = tmpEc;
+    ph          = tmpPh;
+    nitrogenio  = tmpNitrogenio;
+    fosforo     = tmpFosforo;
+    potassio    = tmpPotassio;
+  }
+  // Se nao recebeu linha alguma, manter valores antigos
+}
+
+// -------------------------------------------------------------------
+// Obtem valor de cada medida
+// -------------------------------------------------------------------
+float obterValorMedida(int indice) {
+  switch(indice) {
+    case 0: return umidade;
+    case 1: return temperatura;
+    case 2: return ec;
+    case 3: return ph;
+    case 4: return nitrogenio;
+    case 5: return fosforo;
+    case 6: return potassio;
+  }
+  return 0.0;
+}
+
+// -------------------------------------------------------------------
+// Obtem nome de cada medida
+// -------------------------------------------------------------------
+String obterNomeMedida(int indice) {
+  switch(indice) {
+    case 0: return "Umidade";
+    case 1: return "Temperatura";
+    case 2: return "Condutividade Eletrica";
+    case 3: return "pH";
+    case 4: return "Nitrogenio";
+    case 5: return "Fosforo";
+    case 6: return "Potassio";
+  }
+  return "";
+}
+
+// -------------------------------------------------------------------
+// CONFIGURACAO
+// -------------------------------------------------------------------
+void setup() {
+  // Serial para dados vindos do ESP/LoRa
+  Serial.begin(9600);
+  
+  // Inicializa display
+  tft.begin(0x9341);  // Ajuste se necessario
+  tft.setRotation(1);
+  tft.fillScreen(BLACK);
+
+  desenharMenuPrincipal();
+}
+
+// -------------------------------------------------------------------
+// LOOP PRINCIPAL
+// -------------------------------------------------------------------
+void loop() {
+  // Captura toque na tela
+  TSPoint p = ts.getPoint();
+  pinMode(XM, OUTPUT);
+  pinMode(YP, OUTPUT);
+
+  if (p.z > MINPRESSURE && p.z < MAXPRESSURE) {
+    int16_t screenX = map(p.y, 120, 900, 0, tft.width());
+    int16_t screenY = map(p.x, 100, 900, 0, tft.height());
+
+    if (paginaAtual == PAGINA_MENU) {
+      // Verifica cada botao
+      for (int i = 0; i < NUM_BOTOES_MENU; i++) {
+        Botao &b = botoesMenu[i];
+        bool clicado = (screenX > b.x && screenX < (b.x + b.w) &&
+                        screenY > b.y && screenY < (b.y + b.h));
+        if (clicado) {
+          if (i == 7) {
+            // Botao "Atualizar"
+            lerDadosSerial(); // Le robusto via Serial
+
+            // Efeito: barra de progresso sob o botao
+            int16_t bx = b.x;
+            int16_t by = b.y + b.h + 5;
+            int16_t bw = b.w;
+            int16_t bh = 10;
+            tft.fillRect(bx, by, bw, bh, GRAY);
+            desenharBarraProgresso(bx, by, bw, bh, BLUE);
+
+            // Redesenha menu
+            desenharMenuPrincipal();
+
+          } else {
+            // Clique em um dos parametros
+            indiceMedidaSelecionada = i;
+            // Podemos ler novamente, caso queira sempre dados atualizados
+            // mas se quiser 'congelar' uma leitura, basta comentar:
+            lerDadosSerial();
+
+            paginaAtual = PAGINA_DETALHE;
+            desenharPaginaDetalhe(obterNomeMedida(i), obterValorMedida(i));
+          }
+        }
+      }
+    }
+    else if (paginaAtual == PAGINA_DETALHE) {
+      // Verifica se clicou em "Voltar"
+      if (screenX > botaoVoltar.x && screenX < (botaoVoltar.x + botaoVoltar.w) &&
+          screenY > botaoVoltar.y && screenY < (botaoVoltar.y + botaoVoltar.h)) {
+        paginaAtual = PAGINA_MENU;
+        desenharMenuPrincipal();
+      }
+    }
+  }
+}
