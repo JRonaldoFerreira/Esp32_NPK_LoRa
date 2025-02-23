@@ -19,9 +19,9 @@
 #define MISO  19
 #define MOSI  23
 
-const char* ssid        = "JR_2G";
-const char* password    = "50430034";
-String writeAPIKey      = "2MU2LFM07NP9K1QL";
+const char* ssid        = "nome_da_sua_red";
+const char* password    = "senha da rede";
+String writeAPIKey      = "xxxxxxxxxxxxxxx";
 String server           = "api.thingspeak.com";
 
 WiFiClient client;
