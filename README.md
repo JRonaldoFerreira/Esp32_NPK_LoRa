@@ -56,6 +56,6 @@ O módulo receptor consiste na recepção dos sinais via um microcontrolador Esp
 ![thing speak1](https://github.com/user-attachments/assets/60005193-85a1-42ba-8907-ca664de8b0bc)
 
 
-
+O funcionamento pode ser visto no vídeo: https://www.youtube.com/watch?v=pVxKdPi_raQ
 
 
