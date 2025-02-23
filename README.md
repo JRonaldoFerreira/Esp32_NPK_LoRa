@@ -5,23 +5,25 @@
 
 Sistema capaz de monitorar o solo, com medidas como temperatura, umidade, condutividade elétrica, pH, fósforo, potássio e nitrôgenio via longas distâncias, 12 Km em áreas rurais e até 2 Km em áreas urbadas. Aprentação dos resultados é feita de maneira interativa via um display touch TFT. 
 
-##Componentes essenciais utilizados
 
-Duas placas de Desenvolvimento Wifi Bluetooth ESP32
-Dois módulos Transceptor Longo Alcance Lora SX1278 433Mhz
-NPKPHCTH-S 7 em 1 RS485
-Módulo Conversor de Dados TTL para RS485 com Controle Automático
-Placa Uno R3 Compatível Atmega328 SMD com Cabo Usb
-Display LCD TFT 2.4" Touchscreen Shield
-Módulo Conversor de Nível Lógico Bidirecional
-Mini Painel Solar 5V 200mA
-Mini Placa Solar Fotovoltaica 18V 277mA 5W 165x220mm
-Dois diodos Retificadores Schottky 1A 40V 1N5819(um para cada painel)
-Dois suportes para Bateria 18650 1 Slot Pino Rígido
-Bateria Li-Íon 3.7V 18650 2500mAh (2 unidades)
-Módulo Carregador de Bateria TP4056 - Mini USB
-Módulo Carregador de Bateria de Lítio TP4056 com Proteção Usb Tipo C
-Módulo XL6009 Regulador de Tensão Step Up Ajustável DC-DC
+## Componentes essenciais utilizados
+
+- Duas placas de Desenvolvimento Wifi Bluetooth ESP32
+- Dois módulos Transceptor Longo Alcance Lora SX1278 433Mhz
+- NPKPHCTH-S 7 em 1 RS485
+- Módulo Conversor de Dados TTL para RS485 com Controle Automático
+- Placa Uno R3 Compatível Atmega328 SMD com Cabo Usb
+- Display LCD TFT 2.4" Touchscreen Shield
+- Módulo Conversor de Nível Lógico Bidirecional
+- Mini Painel Solar 5V 200mA
+- Mini Placa Solar Fotovoltaica 18V 277mA 5W 165x220mm
+- Dois diodos Retificadores Schottky 1A 40V 1N5819 (um para cada painel)
+- Dois suportes para Bateria 18650 1 Slot Pino Rígido
+- Bateria Li-Íon 3.7V 18650 2500mAh (2 unidades)
+- Módulo Carregador de Bateria TP4056 - Mini USB
+- Módulo Carregador de Bateria de Lítio TP4056 com Proteção Usb Tipo C
+- Módulo XL6009 Regulador de Tensão Step Up Ajustável DC-DC
+
 
 
 ## Modulo transmissor
