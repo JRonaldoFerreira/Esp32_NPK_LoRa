@@ -6,6 +6,10 @@
 Sistema capaz de monitorar o solo, com medidas como temperatura, umidade, condutividade elétrica, pH, fósforo, potássio e nitrôgenio via longas distâncias, 12 Km em áreas rurais e até 2 Km em áreas urbadas. Aprentação dos resultados é feita de maneira interativa via um display touch TFT. 
 
 
+![receptor](https://github.com/user-attachments/assets/e04af9fa-95d9-4e7c-9608-8960be6599fe)
+![transmissor](https://github.com/user-attachments/assets/3d805200-3e25-4bbb-b38f-9daa6f85b4b9)
+
+
 ## Componentes essenciais utilizados
 
 - Duas placas de Desenvolvimento Wifi Bluetooth ESP32
@@ -44,7 +48,12 @@ O modulo transmissor também tem uma alimentação solar autonôma com duas bat�
 
 
 
-O módulo receptor consiste na recepção dos sinais via um microcontrolador Esp32 com um módulo LoRa, assim como no pré-processamento implementado por parser. Logo em seguida as medidas são proporcionadas interativamente para o usuário através de um display TFT paralelo via uma placa Arduino Uno R3. O envio dos dados para o arduino foi feita através da comunicação serial entre o Arduino e Esp32. Não escolheu-se usar apenas uma placa Esp32 para fazer tudo(recepção e apresentação no display) devido as dificuldades do Esp32 lidar com as funcionalidades de toque do display TFT touch, dificuldade que o arduino não apresenta. 
+O módulo receptor consiste na recepção dos sinais via um microcontrolador Esp32 com um módulo LoRa, assim como no pré-processamento implementado por parser. Logo em seguida as medidas são proporcionadas interativamente para o usuário através de um display TFT paralelo via uma placa Arduino Uno R3. O envio dos dados para o arduino foi feita através da comunicação serial entre o Arduino e Esp32. Não escolheu-se usar apenas uma placa Esp32 para fazer tudo(recepção e apresentação no display) devido as dificuldades do Esp32 lidar com as funcionalidades de toque do display TFT touch, dificuldade que o arduino não apresenta. Além do mais os dados dos sensores são disponiblizados online graficamente via Thing Speak.
+
+
+
+![thing speak2 ](https://github.com/user-attachments/assets/c550c911-1298-4dd6-8bd8-93637ffe0e60)
+![thing speak1](https://github.com/user-attachments/assets/60005193-85a1-42ba-8907-ca664de8b0bc)
 
 
 
